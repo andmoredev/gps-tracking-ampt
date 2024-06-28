@@ -1,0 +1,26 @@
+{
+  "name": "ampt-tutorial",
+  "version": "1.0.0",
+  "description": "Ampt Starter Tutorial",
+  "main": "index.tsx",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "ampt:test": "vitest run --reporter default",
+    "gitpod:ampt": "./node_modules/.bin/ampt"
+  },
+  "ampt": {
+    "app": "gps-tracking-ampt",
+    "org": "andmoredev"
+  },
+  "dependencies": {
+    "@ampt/data": "^1.0.18",
+    "@ampt/sdk": "^1.0.14",
+    "hono": "^3",
+    "ulid": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16",
+    "vitest": "^1.2.2"
+  }
+}

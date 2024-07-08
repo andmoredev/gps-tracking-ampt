@@ -5,9 +5,9 @@ import { ulid } from "ulid";
 import { events, ws, SocketConnection } from "@ampt/sdk";
 const app = new Hono();
 
-app.notFound(c => c.json({ message: "Not Found", ok: false }, 404));
+app.notFound((c) => c.json({ message: "Not Found", ok: false }, 404));
 
-app.post("/sessions", async c => {
+app.post("/sessions", async (c) => {
   const id = ulid();
   const body = await c.req.json();
 
@@ -18,16 +18,16 @@ app.post("/sessions", async c => {
   await data.set(`session:${id}`, {
     id,
     active: true,
-    name: body.name
+    name: body.name,
   });
 
   c.status(201);
   return c.json({
-    id: id
+    id: id,
   });
 });
 
-app.delete("/sessions/:id", async c => {
+app.delete("/sessions/:id", async (c) => {
   const id = c.req.param("id");
 
   await data.remove(`session:${id}`);
@@ -35,43 +35,43 @@ app.delete("/sessions/:id", async c => {
   return c.body(null);
 });
 
-app.get("/sessions", async c => {
+app.get("/sessions", async (c) => {
   const sessions = await data.get("session:*");
 
   return c.json(sessions);
 });
 
-app.get("/sessions/:id", async c => {
+app.get("/sessions/:id", async (c) => {
   const id = c.req.param("id");
 
   const session = await data.get(`session:${id}`, {
-    meta: true
+    meta: true,
   });
 
   return c.json(session);
 });
 
-app.put("/sessions/:id", async c => {
+app.put("/sessions/:id", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json();
 
-  if (!body.name || (body.active === undefined || body.active === null)) {
+  if (!body.name || body.active === undefined || body.active === null) {
     throw new HTTPException(400, {
-      message: "Please provide name and active!"
+      message: "Please provide name and active!",
     });
   }
 
   await data.set(`session:${id}`, {
     id,
     active: body.active,
-    name: body.name
+    name: body.name,
   });
 
   c.status(204);
   return c.body(null);
 });
 
-app.post("/sessions/:id/data", async c => {
+app.post("/sessions/:id/data", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json();
 
@@ -88,7 +88,7 @@ app.post("/sessions/:id/data", async c => {
     session = await data.set(
       `session:${id}`,
       {
-        counter: { $add: 1 }
+        counter: { $add: 1 },
       },
       { exists: true }
     );
@@ -109,25 +109,25 @@ app.post("/sessions/:id/data", async c => {
   await data.set(`session#${id}:${dataId}`, {
     sessionId: id,
     lat: body.lat,
-    lng: body.lng
+    lng: body.lng,
   });
 
   events.publish("coordinate.created", {
-    sessionId: id
+    sessionId: id,
   });
 
   c.status(201);
   return c.json({
-    id: dataId
+    id: dataId,
   });
 });
 
-app.get("/sessions/:id/data", async c => {
+app.get("/sessions/:id/data", async (c) => {
   const id = c.req.param("id");
 
   const getResponse = await data.get(`session#${id}:*`, {
     meta: true,
-    reverse: true
+    reverse: true,
   });
 
   return c.json(getResponse);
@@ -142,7 +142,7 @@ app.get("/sessions/:id/data", async c => {
 //   // });
 // });
 
-data.on("updated", async event => {
+data.on("updated:session:*", async (event) => {
   if (
     event.item.value.counter % 10 == 0 &&
     event.item.value.counter != event.previous.value.counter
@@ -150,7 +150,7 @@ data.on("updated", async event => {
     let totalDistance = 0;
     const getResponse = await data.get(`session#${event.item.value.id}:*`, {
       limit: 10,
-      reverse: true
+      reverse: true,
     });
     let previousItem;
     getResponse.items.forEach((item: any) => {
@@ -158,11 +158,11 @@ data.on("updated", async event => {
         const distance = haversineDistance(
           {
             lat: item.value.lat,
-            lon: item.value.lng
+            lon: item.value.lng,
           },
           {
             lat: previousItem.value.lat,
-            lon: previousItem.value.lng
+            lon: previousItem.value.lng,
           }
         );
         totalDistance += distance;
@@ -176,17 +176,17 @@ data.on("updated", async event => {
 
     ws.send("distance.calculated", {
       sessionId: event.item.value.id,
-      distance: totalDistance
+      distance: totalDistance,
     });
-    
+
     await data.set(event.item.key, {
-      distance: totalDistance
+      distance: totalDistance,
     });
   }
 });
 
 function haversineDistance(coord1, coord2) {
-  const toRad = value => value * Math.PI / 180;
+  const toRad = (value) => (value * Math.PI) / 180;
 
   const R = 6371; // Radius of the Earth in kilometers
   const lat1 = toRad(coord1.lat);

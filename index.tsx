@@ -79,10 +79,6 @@ app.post("/sessions/:id/data", async (c) => {
     throw new HTTPException(400, { message: "Data is required!" });
   }
 
-  // const session: any = await data.set(`session:${id}`, {
-  //   counter: { $add: 1 }
-  // }, { exists: true });
-
   let session;
   try {
     session = await data.set(
@@ -133,16 +129,8 @@ app.get("/sessions/:id/data", async (c) => {
   return c.json(getResponse);
 });
 
-// events.on("coordinate.created", async event => {
-//   console.log("event", event);
-//   // await data.set(`session#${event.item.value.sessionId}:${event.item.key}`, {
-//   //   sessionId: event.item.value.sessionId,
-//   //   lat: event.item.value.lat,
-//   //   lng: event.item.value.lng
-//   // });
-// });
-
 data.on("updated:session:*", async (event) => {
+  console.log('Counter', event.item.value.counter);
   if (
     event.item.value.counter % 10 == 0 &&
     event.item.value.counter != event.previous.value.counter
@@ -174,15 +162,49 @@ data.on("updated:session:*", async (event) => {
 
     console.log("Total distance", totalDistance, "KM");
 
-    ws.send("distance.calculated", {
-      sessionId: event.item.value.id,
-      distance: totalDistance,
+    const connections = await data.getByLabel('label1', `session:${event.item.value.id}`)
+    connections.items.forEach((connection: any) => {
+      ws.send(connection.value.connectionId, {
+        sessionId: event.item.value.id,
+        distance: totalDistance,
+      });
     });
 
     await data.set(event.item.key, {
       distance: totalDistance,
     });
   }
+});
+
+ws.on("connected", async (connection) => {
+  const { connectionId } = connection;
+  const sessionId = connection.meta.headers['X-Session-Id'];
+
+  if (await ws.isConnected(connectionId)) {
+    if (!sessionId) {
+      await ws.send(connectionId, "Session ID is required!");
+      return;
+    }
+
+    const session = await data.get(`session:${sessionId}`);
+    if (!session) {
+      await ws.send(connectionId, "Session not found!");
+      return;
+    }
+
+    await data.set(`connections:${connectionId}`, {
+      connectionId: connectionId,
+    },
+    { label1: `session:${sessionId}` });
+
+    await ws.send(connectionId, `Connected successfully to session ${sessionId}!`);
+  } else {
+    console.log(`Connection ${connectionId} is not connected!`);
+  }
+});
+
+ws.on("disconnected", async (connection: SocketConnection, reason?: string) => {
+  await data.remove(`connections:${connection.connectionId}`);
 });
 
 function haversineDistance(coord1, coord2) {

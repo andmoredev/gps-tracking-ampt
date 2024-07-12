@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { data } from "@ampt/data";
-import { ulid } from "ulid";
-import { events, ws, SocketConnection } from "@ampt/sdk";
+import { ulid, decodeTime } from "ulid";
+import { ws, SocketConnection } from "@ampt/sdk";
 const app = new Hono();
 
 app.notFound((c) => c.json({ message: "Not Found", ok: false }, 404));
@@ -104,13 +104,19 @@ app.post("/sessions/:id/data", async (c) => {
 
   await data.set(`session#${id}:${dataId}`, {
     sessionId: id,
+    dataId,
     lat: body.lat,
     lng: body.lng,
   });
 
-  events.publish("coordinate.created", {
-    sessionId: id,
+  const connections = await data.getByLabel('label1', `session:${id}`)
+  connections.items.forEach((connection: any) => {
+    ws.send(connection.value.connectionId, {
+      lat: body.lat,
+      lng: body.lng,
+    });
   });
+
 
   c.status(201);
   return c.json({
@@ -132,16 +138,20 @@ app.get("/sessions/:id/data", async (c) => {
 data.on("updated:session:*", async (event) => {
   console.log('Counter', event.item.value.counter);
   if (
-    event.item.value.counter % 10 == 0 &&
+    event.item.value.counter % 1 == 0 &&
     event.item.value.counter != event.previous.value.counter
   ) {
     let totalDistance = 0;
-    const getResponse = await data.get(`session#${event.item.value.id}:*`, {
-      limit: 10,
+
+    let getResponse: any = await data.get(`session#${event.item.value.id}:*`, {
+      limit: 100,
       reverse: true,
     });
+
+    const items = getResponse.items; // [];
+
     let previousItem;
-    getResponse.items.forEach((item: any) => {
+    items.forEach((item: any) => {
       if (previousItem) {
         const distance = haversineDistance(
           {
@@ -153,6 +163,7 @@ data.on("updated:session:*", async (event) => {
             lon: previousItem.value.lng,
           }
         );
+
         totalDistance += distance;
         previousItem = item;
       } else {
@@ -160,25 +171,29 @@ data.on("updated:session:*", async (event) => {
       }
     });
 
-    console.log("Total distance", totalDistance, "KM");
+    const latestTime = decodeTime(items[0].value.dataId);
+    const earliestTime = decodeTime(items[items.length - 1].value.dataId);
 
-    const connections = await data.getByLabel('label1', `session:${event.item.value.id}`)
-    connections.items.forEach((connection: any) => {
-      ws.send(connection.value.connectionId, {
-        sessionId: event.item.value.id,
-        distance: totalDistance,
-      });
-    });
+    // Calculate the time difference in seconds
+    const timeDifference = latestTime - earliestTime;
+    console.log('timeDifference', timeDifference);
+
+    // Calculate the speed in km/h
+    const speedKmh = (totalDistance / timeDifference) * 3600.0;
+
+    console.log("Total distance", totalDistance, "KM");
+    console.log("Speed", speedKmh, "KM/h");
 
     await data.set(event.item.key, {
       distance: totalDistance,
+      speed: speedKmh,
     });
   }
 });
 
 ws.on("connected", async (connection) => {
   const { connectionId } = connection;
-  const sessionId = connection.meta.headers['X-Session-Id'];
+  const sessionId = connection.meta.headers['X-Session-Id'] ?? connection.meta.queryStringParameters?.sessionId;
 
   if (await ws.isConnected(connectionId)) {
     if (!sessionId) {
@@ -196,8 +211,6 @@ ws.on("connected", async (connection) => {
       connectionId: connectionId,
     },
     { label1: `session:${sessionId}` });
-
-    await ws.send(connectionId, `Connected successfully to session ${sessionId}!`);
   } else {
     console.log(`Connection ${connectionId} is not connected!`);
   }

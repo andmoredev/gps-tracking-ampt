@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="">
+
+<head>
+  <title>Map from Ampt</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+
+  <script>
+    L_NO_TOUCH = false;
+    L_DISABLE_3D = false;
+  </script>
+
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+  <style>
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      left: 0;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.6.0/dist/leaflet.js"></script>
+  <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+  <script
+    src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.6.0/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css" />
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css" />
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css" />
+  <link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css" />
+
+  <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <style>
+    #map {
+      position: relative;
+      width: 100.0%;
+      height: 100.0%;
+      left: 0.0%;
+      top: 0.0%;
+    }
+  </style>
+
+</head>
+
+<body>
+  <div>
+    <label for="sessionId">WebSocket Base URL</label>
+    <input type="text" placeholder="Enter WebSocket Base URL" id="wsBaseUrl" style="width: 300px;"/>
+  </div>
+
+  <div>
+    <label for="sessionId">Session Id</label>
+    <input type="text" placeholder="Enter Session Id" id="sessionId" style="width: 300px;"/>
+  </div>
+  <button onclick="connect()">Connect</button>
+  <button onclick="disconnect()">Disconnect</button>
+
+  <div class="folium-map" id="map"></div>
+
+
+</body>
+<script>
+  let myWebSocket;
+  let lastPoint;
+  let map;
+  function connect() {
+    if (myWebSocket) {
+      myWebSocket.close();
+    }
+
+    const sessionId = document.getElementById('sessionId').value;
+    const wsBaseUrl = document.getElementById('wsBaseUrl').value;
+    myWebSocket = new WebSocket(`${wsBaseUrl}?sessionId=${sessionId}`);
+
+    console.log('connected');
+    let polyLine;
+
+    myWebSocket.onmessage = function (event) {
+      if (event.data !== 'string') {
+        const data = JSON.parse(event.data);
+        const { lat, lng } = data;
+        if (!map) {
+          map = L.map('map');
+
+          map.setView([lat, lng], 13);
+
+          L.tileLayer(
+            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            { "attribution": "Data by \u0026copy; \u003ca href=\"http://openstreetmap.org\"\u003eOpenStreetMap\u003c/a\u003e, under \u003ca href=\"http://www.openstreetmap.org/copyright\"\u003eODbL\u003c/a\u003e.", "detectRetina": false, "maxNativeZoom": 18, "maxZoom": 18, "minZoom": 0, "noWrap": false, "opacity": 1, "subdomains": "abc", "tms": false }
+          ).addTo(map);
+
+          L.marker(
+            [lat, lng],
+            {}
+          ).addTo(map);
+
+          polyLine = L.polyline(
+            [[lat, lng]],
+            { "bubblingMouseEvents": true, "color": "red", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "red", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 3 }
+          ).addTo(map);
+        }
+
+        polyLine.addLatLng([lat, lng]);
+
+        lastPoint = [lat, lng];
+
+
+      }
+    }
+  }
+
+  function disconnect() {
+    myWebSocket.close();
+    console.log('disconnected');
+
+    L.marker(
+          lastPoint,
+          {}
+        ).addTo(map);
+  };
+</script>
+
+</html>

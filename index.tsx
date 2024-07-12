@@ -138,7 +138,7 @@ app.get("/sessions/:id/data", async (c) => {
 data.on("updated:session:*", async (event) => {
   console.log('Counter', event.item.value.counter);
   if (
-    event.item.value.counter % 1 == 0 &&
+    event.item.value.counter % 10 == 0 &&
     event.item.value.counter != event.previous.value.counter
   ) {
     let totalDistance = 0;

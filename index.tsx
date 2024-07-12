@@ -148,7 +148,7 @@ data.on("updated:session:*", async (event) => {
       reverse: true,
     });
 
-    const items = getResponse.items; // [];
+    const items = getResponse.items;
 
     let previousItem;
     items.forEach((item: any) => {
